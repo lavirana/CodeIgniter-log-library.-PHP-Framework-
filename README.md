@@ -1,26 +1,33 @@
-# CodeIgniter Event Logger Library
+# 🚀 CodeIgniter Event Logger Library
 
-A lightweight, extensible logging library for CodeIgniter (3.x) to capture and track **insert**, **update**, and **delete** operations on database tables with user and request metadata.
+A lightweight, extensible logging library for CodeIgniter (3.x) to track **insert**, **update**, and **delete** operations on database tables with rich metadata including user and request context.
 
 ## 📦 Features
 
-- Logs **insert**, **update**, and **delete** events.
-- Tracks changed fields with before/after values (for update).
-- Captures user IP, browser info, and session ID.
-- Simple plug-and-play integration.
-- Useful for **auditing**, **debugging**, and **change tracking**.
-
----
+- Logs **Insert**, **Update**, and **Delete** events  
+- Tracks changed fields (for updates) with **before/after** values  
+- Captures:
+  - User IP  
+  - Browser info (User Agent)  
+  - User ID from session  
+- Easy plug-and-play integration  
+- Ideal for **auditing**, **debugging**, and **change tracking**
 
 ## 📁 Installation
 
-1. **Copy the library file** to your application:
-   ```bash
-   application/libraries/Event_logger.php
+### 1. Add Library
 
+Copy the library file into your CodeIgniter project:
 
-Create the database table used for logs:
+```
+application/libraries/Event_logger.php
+```
 
+### 2. Create `event_logs` Table
+
+Run this SQL to create the table used for logging:
+
+```sql
 CREATE TABLE `event_logs` (
   `id` INT NOT NULL AUTO_INCREMENT PRIMARY KEY,
   `event_name` VARCHAR(50),
@@ -33,61 +40,80 @@ CREATE TABLE `event_logs` (
   `user_agent` VARCHAR(255),
   `added_on` DATETIME
 );
+```
 
-⚙️ Usage
-1. Load the library in your controller/model
+## ⚙️ Usage
 
+### 1. Load the Logger
+
+In your controller or model:
+
+```php
 $this->load->library('event_logger');
+```
 
-2. Log an insert operation
+### 2. Log an Insert Event
 
-
+```php
 $data = [
-  'name' => 'hello Dear',
+  'name' => 'Hello Dear',
   'email' => 'hello@example.com'
 ];
 $this->event_logger->log_event('insert', $data, 'users');
+```
 
+### 3. Log an Update Event
 
-4. Log an update operation
-
+```php
 $updated_data = [
   'email' => 'newemail@example.com'
 ];
 $this->event_logger->log_event('update', $updated_data, 'users', 'id', 5);
+```
 
+### 4. Log a Delete Event
 
-5. Log a delete operation
-
+```php
 $this->event_logger->log_event('delete', [], 'users', 'id', 5);
+```
 
+## 🧠 How It Works
 
-🧠 How It Works
-insert: Stores all fields in event_values.
+- **Insert**: Saves all fields as `event_values`  
+- **Update**: Compares new vs existing values, logs only changed fields  
+- **Delete**: Logs the full row before deletion
 
-update: Compares new values with existing, stores only changed fields.
+Each event stores:
 
-delete: Captures full row before deletion.
+- `updated_by`: from session (default: `admin_id`)  
+- `ip_address`: user's IP  
+- `user_agent`: browser/device info  
+- `added_on`: timestamp  
 
-All operations include:
+## 🔧 Customization
 
-updated_by: User ID from session (admin_id by default)
+- Modify session key (`admin_id`) from:
 
-ip_address: Client IP
+```php
+$this->CI->session->userdata('admin_id');
+```
 
-user_agent: Browser/device
+- Extend the class to support:
+  - Soft deletes  
+  - Field exclusion/inclusion rules  
+  - Logging only specific tables  
 
-added_on: Timestamp
+## 📌 Requirements
 
-🔧 Customization
-Session key for admin_id can be modified in the _get_user_id() function.
+- ✅ CodeIgniter 3.x  
+- ✅ PHP 5.6+
 
-Extend this class to add support for soft deletes or table-specific filters.
+> ⚠️ Not tested on CodeIgniter 4.x — for CI4 support, refactor to CI4 services.
 
-📌 Requirements
-CodeIgniter 3.x (not tested on CI4)
+## 📃 License
 
-PHP 5.6+
+MIT License
 
+## 🙌 Contributions Welcome
 
-
+Feel free to fork and submit pull requests for improvements or CI4 compatibility!
