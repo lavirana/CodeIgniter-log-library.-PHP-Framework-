@@ -40,7 +40,8 @@ CREATE TABLE `event_logs` (
 $this->load->library('event_logger');
 
 2. Log an insert operation
-```bash
+
+
 $data = [
   'name' => 'hello Dear',
   'email' => 'hello@example.com'
@@ -48,9 +49,8 @@ $data = [
 $this->event_logger->log_event('insert', $data, 'users');
 
 
-
 4. Log an update operation
-```bash
+
 $updated_data = [
   'email' => 'newemail@example.com'
 ];
@@ -58,7 +58,7 @@ $this->event_logger->log_event('update', $updated_data, 'users', 'id', 5);
 
 
 5. Log a delete operation
-```bash
+
 $this->event_logger->log_event('delete', [], 'users', 'id', 5);
 
 
