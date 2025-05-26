@@ -1,118 +1,114 @@
 <?php
-
 defined('BASEPATH') OR exit('No direct script access allowed');
+
 class Event_logger {
-  /**
-     * ci
-     *
-     * @param instance object
-     */
- protected $CI;
-    /**
-     * log table name
-     *
-     * @param string
-     */
+    protected $CI;
     private $_log_table_name = 'event_logs';
 
- // We'll use a constructor, as you can't directly call a function
- // from a property definition.
- 
- public function __construct()
- {
-   // Assign the CodeIgniter super-object
-   $this->CI =& get_instance();
-      $this->CI->load->database();
-   $this->_log_table_name = 'event_logs';
- }
- 
- /*
-  Logger Function
- */
- public function log_event($event,$data,$table,$unique_identifier="",$unique_identifier_value=''){
-  if(!$this->CI->db->table_exists($table) )
-  {
-   echo "Event Logger : Table - $table  does not exists";
-   exit();
-  }
-  
-  if($event == "update")
-  {
-   if(empty($unique_identifier) || empty($unique_identifier_value))
-   {
-    echo "Event Logger : Update operation unique key not defined";
-    exit();
-   }
-   
-   $logData = "";
-   
-   if(!empty($data) > 0 ){
-    foreach($data as $key=>$value){
-     $sql = "SELECT $key FROM $table WHERE $unique_identifier = $unique_identifier_value";
-     $query = $this->CI->db->query($sql);
-     $row = $query->row();
-     if (isset($row)){
-      if(strtolower($row->$key) != strtolower($value)){
-       $logData[$key] = array("old_value"=>$row->$key,"new_value" => $value);
-      }
-     } 
+    public function __construct() {
+        $this->CI =& get_instance();
+        $this->CI->load->database();
     }
-    
-    if(!empty($logData)){
-      $finalData = array(
-           'event_name' =>$event,
-           'event_table' =>$table,
-           'table_unique_id' =>$unique_identifier,
-           'unique_id' =>$unique_identifier_value,
-           'event_values' =>json_encode($logData),
-           'updated_by' => $this->CI->session->userdata('admin_id'),
-           'ip_address' => $this->CI->input->ip_address(),
-           'user_agent' => $this->CI->input->user_agent(),
-           'added_on' => date('Y-m-d H:i:s'),
-    
-         );
-     $this->CI->db->insert($this->_log_table_name, $finalData);
+
+    /**
+     * Log an event (insert, update, delete)
+     */
+    public function log_event($event, $data, $table, $unique_identifier = "", $unique_identifier_value = "") {
+        if (!$this->CI->db->table_exists($table)) {
+            log_message('error', "Event Logger: Table '$table' does not exist.");
+            return false;
+        }
+
+        switch (strtolower($event)) {
+            case 'insert':
+                return $this->_log_insert($data, $table);
+            
+            case 'update':
+                return $this->_log_update($data, $table, $unique_identifier, $unique_identifier_value);
+            
+            case 'delete':
+                return $this->_log_delete($table, $unique_identifier, $unique_identifier_value);
+            
+            default:
+                log_message('error', "Event Logger: Unknown event '$event'");
+                return false;
+        }
     }
-   }else{
-    echo "Event Logger : update event data is blank";
-    exit();
-   }
-  }
-  
-  
-  if($event == "insert"){
-   
-   $finalData = array(
-           'event_name' => $event,
-           'event_table' =>$table,
-           'event_values' =>json_encode($data),
-           'updated_by' => $this->CI->session->userdata('admin_id'),
-           'ip_address' => $this->CI->input->ip_address(),
-           'user_agent' => $this->CI->input->user_agent(),
-           'added_on' => date('Y-m-d H:i:s'),
-    
-         );
-   $this->CI->db->insert($this->_log_table_name, $finalData);
-  }
-  
-  if($event == "delete"){
-   
-   $sql = "SELECT * FROM $table WHERE $unique_identifier = $unique_identifier_value";
-   $query = $this->CI->db->query($sql);
-   $row = $query->row();
-   $finalData = array(
-           'event_name' => $event,
-           'event_table' =>$table,
-           'event_values' =>json_encode($row),
-           'updated_by' => $this->CI->session->userdata('admin_id'),
-           'ip_address' => $this->CI->input->ip_address(),
-           'user_agent' => $this->CI->input->user_agent(),
-           'added_on' => date('Y-m-d H:i:s'),
-    
-         );
-   $this->CI->db->insert($this->_log_table_name, $finalData);
-  }
-    
- }
- 
+
+    private function _log_insert($data, $table) {
+        $log_entry = [
+            'event_name' => 'insert',
+            'event_table' => $table,
+            'event_values' => json_encode($data),
+            'updated_by' => $this->_get_user_id(),
+            'ip_address' => $this->CI->input->ip_address(),
+            'user_agent' => $this->CI->input->user_agent(),
+            'added_on' => date('Y-m-d H:i:s'),
+        ];
+        return $this->CI->db->insert($this->_log_table_name, $log_entry);
+    }
+
+    private function _log_update($data, $table, $key, $value) {
+        if (empty($key) || empty($value)) {
+            log_message('error', "Event Logger: Update requires unique identifier and value.");
+            return false;
+        }
+
+        $changes = [];
+        foreach ($data as $column => $new_val) {
+            $this->CI->db->select($column);
+            $this->CI->db->where($key, $value);
+            $row = $this->CI->db->get($table)->row();
+
+            if ($row && strtolower(trim($row->$column)) !== strtolower(trim($new_val))) {
+                $changes[$column] = ['old_value' => $row->$column, 'new_value' => $new_val];
+            }
+        }
+
+        if (!empty($changes)) {
+            $log_entry = [
+                'event_name' => 'update',
+                'event_table' => $table,
+                'table_unique_id' => $key,
+                'unique_id' => $value,
+                'event_values' => json_encode($changes),
+                'updated_by' => $this->_get_user_id(),
+                'ip_address' => $this->CI->input->ip_address(),
+                'user_agent' => $this->CI->input->user_agent(),
+                'added_on' => date('Y-m-d H:i:s'),
+            ];
+            return $this->CI->db->insert($this->_log_table_name, $log_entry);
+        }
+
+        return false;
+    }
+
+    private function _log_delete($table, $key, $value) {
+        if (empty($key) || empty($value)) {
+            log_message('error', "Event Logger: Delete requires unique identifier and value.");
+            return false;
+        }
+
+        $this->CI->db->where($key, $value);
+        $row = $this->CI->db->get($table)->row();
+
+        if ($row) {
+            $log_entry = [
+                'event_name' => 'delete',
+                'event_table' => $table,
+                'event_values' => json_encode($row),
+                'updated_by' => $this->_get_user_id(),
+                'ip_address' => $this->CI->input->ip_address(),
+                'user_agent' => $this->CI->input->user_agent(),
+                'added_on' => date('Y-m-d H:i:s'),
+            ];
+            return $this->CI->db->insert($this->_log_table_name, $log_entry);
+        }
+
+        return false;
+    }
+
+    private function _get_user_id() {
+        return $this->CI->session->userdata('admin_id') ?? 0;
+    }
 }
