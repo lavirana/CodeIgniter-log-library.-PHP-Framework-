@@ -47,12 +47,15 @@ $data = [
 ];
 $this->event_logger->log_event('insert', $data, 'users');
 
+
+
 4. Log an update operation
 ```bash
 $updated_data = [
   'email' => 'newemail@example.com'
 ];
 $this->event_logger->log_event('update', $updated_data, 'users', 'id', 5);
+
 
 5. Log a delete operation
 ```bash
